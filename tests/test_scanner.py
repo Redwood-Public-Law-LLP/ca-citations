@@ -741,5 +741,13 @@ def test_real_letter_suffixes_survive_the_word_check() -> None:
     ]
 
 
+def test_sentence_ending_inside_parentheses_does_not_block_a_bare_cite() -> None:
+    """'(Emphasis added.) section 85102(a)' -- the period ends the sentence;
+    the closing parenthesis is not some other source."""
+    results = scan('"in any fiscal year." (Emphasis added.) section 85102(a) defines it.',
+                   default_law_code="GOV")
+    assert [(r.law_code, r.section_num) for r in results] == [("GOV", "85102")]
+
+
 def test_year_parenthetical_still_blocks_a_bare_cite() -> None:
     assert scan("Corbin on Contracts (2024) § 4.5 explains", default_law_code="GOV") == []

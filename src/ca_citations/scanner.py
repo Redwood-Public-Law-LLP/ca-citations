@@ -391,6 +391,11 @@ def _follows_other_source(text: str, anchor: re.Match[str]) -> bool:
     if anchor.group("marker")[0].isupper() and re.search(r"[.?!][)\]”\"’']?$", stripped):
         # "Section 5" opening a sentence: the period ends the previous one.
         return False
+    if re.search(r"[.?!][)\]]$", stripped):
+        # "(Emphasis added.) section 85102(a)": the sentence ended inside the
+        # parenthetical, so the ")" closes a sentence, not some other source
+        # ("Corbin on Contracts (2024) §" has no period and still counts).
+        return False
     return _OTHER_SOURCE_RE.search(before) is not None
 
 
