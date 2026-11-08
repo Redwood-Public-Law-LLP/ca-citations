@@ -125,7 +125,7 @@ _FORWARD_RE = re.compile(
 # used with .match(text, pos), which already anchors at pos — "^" would anchor
 # at the start of the whole text and never match there.
 _FORWARD_CONNECTOR_RE = re.compile(
-    r"\s*(?:,\s*)?(?:inclusive\s*,?\s*)?(?:of\s+)?(?:the\s+)?", re.IGNORECASE
+    r"\s*\[?(?:,\s*)?(?:inclusive\s*,?\s*)?(?:of\s+)?(?:the\s+)?", re.IGNORECASE
 )
 
 # Maximum tokens to try when walking for the code name. Real CA citations
@@ -159,8 +159,12 @@ def _code_name_ok(candidate: str) -> bool:
 # capitalized marker or "§", optionally through an opening parenthesis, is
 # that shape. Real cites put a comma or nothing there ("Gov. Code, § 54953",
 # "Gov. Code § 54953"); an abbreviation ("Code Civ. Proc. § 425.16") is not a
-# full word, so it is unaffected.
+# full word, so it is unaffected. Before "§" the opening parenthesis is
+# required: "(Gov. Code. § 36503.)" is a typo inside one citation, and AG
+# opinions have it often enough that treating it as a sentence end lost real
+# cites (13 rows across 1,967 opinions, measured 2026-11-08).
 _SENTENCE_END_CODE_RE = re.compile(r"\b(?:Code|Procedure)\.\s*[(\[]?\s*$")
+_SENTENCE_END_CODE_BEFORE_SYMBOL_RE = re.compile(r"\b(?:Code|Procedure)\.\s*[(\[]\s*$")
 
 
 def _tokens_in(text: str, lo: int, hi: int) -> list[tuple[int, int]]:
@@ -207,6 +211,9 @@ def _walk_backward_for_code(text: str, end: int) -> tuple[CodeEntry, int] | None
     return None
 
 
+_GLUED_FOOTNOTE_RE = re.compile(r"(?<=Code)\.?\d{1,3}\W*$")
+
+
 def _walk_forward_for_code(text: str, pos: int) -> tuple[CodeEntry, int] | None:
     """Find an "of the <Code>" phrase starting at `text[pos]`.
 
@@ -239,6 +246,13 @@ def _walk_forward_for_code(text: str, pos: int) -> tuple[CodeEntry, int] | None:
     for n in range(upper, 0, -1):
         end = tokens[n - 1][1]
         candidate = text[base:end]
+        # A footnote number printed against the code name: "of the Government
+        # Code1 provides", "of the Education Code.1 (§§ ...)". Read the name
+        # without it; the citation span stops at the name.
+        glued = _GLUED_FOOTNOTE_RE.search(candidate)
+        if glued is not None:
+            candidate = candidate[: glued.start()]
+            end = base + glued.start()
         if not _code_name_ok(candidate):
             continue
         entry = resolve_code(candidate)
@@ -480,6 +494,25 @@ def _collect_continuations(
     return items, anchor_range_end, pos
 
 
+# A section number followed by a space and more digits is a number broken by
+# OCR ("Government Code Sections 8 1000 through 9 1014" is 81000-91014), never
+# a citation to the first fragment. OCR also reads 0/1 as O/I/l, so letters
+# from that set count when the token has at least one digit ("8 IO00").
+_SPLIT_NUMBER_RE = re.compile(r"[ \t]+(?=[0-9IlO]*[0-9])[0-9IlO]{2,}(?![A-Za-z])")
+
+# A "letter suffix" that is really an English word glued to the number:
+# "section 82041of the Act". Real suffixes are one or two letters with no
+# meaning ("330a", "1203.1bb"); these are words, so the number stands alone.
+_WORD_SUFFIXES = {"of", "or", "to", "in", "on", "at", "as", "by", "is", "an", "if", "et"}
+
+
+def _strip_word_suffix(section_num: str) -> str:
+    m = re.search(r"[A-Za-z]+$", section_num)
+    if m and m.group(0).lower() in _WORD_SUFFIXES:
+        return section_num[: m.start()]
+    return section_num
+
+
 def _make_citation(
     text: str,
     section_num: str,
@@ -504,7 +537,7 @@ def _make_citation(
     return SpannedCitation(
         raw=text[span_start:span_end],
         law_code=law_code,
-        section_num=section_num,
+        section_num=_strip_word_suffix(section_num),
         article=article,
         subsection_path=_LABEL_RE.findall(subsection_text) or None,
         confidence=confidence,
@@ -641,6 +674,8 @@ def scan(
     const_positions = [m.start() for m in _CONST_MENTION_RE.finditer(text)]
 
     for anchor in _ANCHOR_RE.finditer(text):
+        if _SPLIT_NUMBER_RE.match(text, anchor.end()):
+            continue  # "Sections 8 1000": an OCR-split number, not § 8
         # Greedy forward extension for trailing subdivisions / subd. text.
         subsection_end = anchor.end()
         fwd = _FORWARD_RE.match(text, subsection_end)
@@ -765,8 +800,12 @@ def _attribute_code(
     backward = _walk_backward_for_code(text, code_end)
     if (
         backward is not None
-        and (anchor.group("marker")[0].isupper() or anchor.group("marker")[0] == "§")
-        and _SENTENCE_END_CODE_RE.search(text, backward[1], code_end)
+        and (
+            (anchor.group("marker")[0].isupper()
+             and _SENTENCE_END_CODE_RE.search(text, backward[1], code_end))
+            or (anchor.group("marker")[0] == "§"
+                and _SENTENCE_END_CODE_BEFORE_SYMBOL_RE.search(text, backward[1], code_end))
+        )
     ):
         backward = None  # sentence-final mention; carry-forward picks it up
     if backward is not None:

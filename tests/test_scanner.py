@@ -666,3 +666,80 @@ def test_reference_start_points_list_members_at_the_first_citation() -> None:
     assert first.reference_start == first.span_start
     assert second.reference_start == first.span_start
     assert "Penal Code" in first.raw and "Penal" not in second.raw
+
+
+# --- found comparing stored advisory rows on real documents, 2026-11-08 ------
+# Each input is an excerpt from a published AG opinion or FPPC letter.
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("the city treasurer. (Gov. Code. § 36503.) The council may", ("GOV", "36503")),
+        ("its powers (Wat. Code. § 71722), impose taxes", ("WAT", "71722")),
+        ("(E.g., Welf. & Inst. Code. § 16702, subd. (d), providing", ("WIC", "16702")),
+    ],
+)
+def test_code_typo_with_period_before_section_symbol_is_named(text: str, expected) -> None:
+    """'Code.' then '§' inside one parenthetical is a typo, not a sentence end."""
+    (result,) = scan(text)
+    assert ((result.law_code, result.section_num), result.attribution) == (expected, "named")
+
+
+def test_sentence_final_code_before_parenthesized_symbol_is_still_carried() -> None:
+    (result,) = scan("We look to the Government Code. (§ 54953.)")
+    assert result.attribution == "carried"
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("ANALYSIS Section 1090 of the Government Code1 provides in part:", ("GOV", "1090")),
+        ("section 933.5 of the Penal Code1 provided:", ("PEN", "933.5")),
+        ("in section 70901 of the Education Code.1 (§§ 70900, 71000.)", ("EDC", "70901")),
+        ("Prior to 1980 section 11423 of the Government Code2 provided:", ("GOV", "11423")),
+    ],
+)
+def test_footnote_number_glued_to_a_trailing_code_name(text: str, expected) -> None:
+    results = scan(text)
+    assert (results[0].law_code, results[0].section_num) == expected
+    assert results[0].attribution == "named"
+
+
+def test_bracketed_trailing_code_name() -> None:
+    (result,) = scan("as contemplated by section 11546 [of the Business and Professions Code].")
+    assert (result.law_code, result.section_num) == ("BPC", "11546")
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The Political Reform Act is contained in Government Code Sections 8 1000 through 9 1014.",
+        "Government Code sections 8 1000 - 9 1 01 5. Commission regulations appear",
+        "is contained in Government Code Sections 8 IO00 through 91014.",
+        "required to file quarterly reports under Government Code section 8a 202.3(a)",
+    ],
+)
+def test_ocr_split_number_is_not_a_citation(text: str) -> None:
+    """'8 1000' is 81000 broken by OCR; citing § 8 would be invented."""
+    assert [r.section_num for r in scan(text)] in ([], ["91014"])
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("a local government agency under Gov. Code section 82041of the Act.", "82041"),
+        ("See Gov. Code section 1090or section 1091.", "1090"),
+    ],
+)
+def test_english_word_glued_to_a_number_is_not_a_letter_suffix(text: str, expected: str) -> None:
+    assert scan(text)[0].section_num == expected
+
+
+def test_real_letter_suffixes_survive_the_word_check() -> None:
+    assert [r.section_num for r in scan("Pen. Code § 1203.1bb and Gov. Code § 5473a")] == [
+        "1203.1bb", "5473a",
+    ]
+
+
+def test_year_parenthetical_still_blocks_a_bare_cite() -> None:
+    assert scan("Corbin on Contracts (2024) § 4.5 explains", default_law_code="GOV") == []
