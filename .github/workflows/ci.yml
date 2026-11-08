@@ -1,0 +1,44 @@
+name: CI
+
+# Lint, type-check, and test on Python 3.11, the oldest version supported.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: lint + types + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Install dependencies (locked)
+        run: uv sync --frozen --extra dev
+
+      - name: Lockfile is in sync with pyproject.toml
+        run: uv lock --check
+
+      - name: ruff
+        run: uv run --frozen ruff check src tests
+
+      - name: mypy
+        run: uv run --frozen mypy src
+
+      - name: pytest
+        run: uv run --frozen pytest -q

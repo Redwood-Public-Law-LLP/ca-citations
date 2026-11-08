@@ -1,0 +1,338 @@
+[
+  {
+    "id": "bluebook-civ-bare",
+    "input": "Cal. Civ. Code § 1714",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "bluebook-civ-subdiv-a",
+    "input": "Cal. Civ. Code § 1714(a)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["a"],
+    "confidence": "high"
+  },
+  {
+    "id": "bluebook-civ-deep-subdiv",
+    "input": "Cal. Civ. Code § 1714(a)(1)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["a", "1"],
+    "confidence": "high"
+  },
+  {
+    "id": "csm-civ-spelled-out",
+    "input": "Civil Code section 1714, subdivision (a)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["a"],
+    "confidence": "high"
+  },
+  {
+    "id": "csm-civ-subd-abbrev",
+    "input": "Civ. Code, § 1714, subd. (a)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["a"],
+    "confidence": "high"
+  },
+  {
+    "id": "csm-civ-subd-multi",
+    "input": "Civ. Code, § 1714, subd. (a)(1)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["a", "1"],
+    "confidence": "high"
+  },
+  {
+    "id": "ccp-bluebook-suffixed-num",
+    "input": "Cal. Civ. Proc. Code § 425.16",
+    "law_code": "CCP",
+    "section_num": "425.16",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "ccp-shorthand",
+    "input": "CCP § 425.16",
+    "law_code": "CCP",
+    "section_num": "425.16",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "ccp-csm-form",
+    "input": "Code Civ. Proc., § 425.16",
+    "law_code": "CCP",
+    "section_num": "425.16",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "ccp-deep-suffix-subdiv",
+    "input": "Code Civ. Proc., § 425.16, subd. (b)(1)",
+    "law_code": "CCP",
+    "section_num": "425.16",
+    "subsection_path": ["b", "1"],
+    "confidence": "high"
+  },
+  {
+    "id": "pen-bluebook",
+    "input": "Cal. Penal Code § 187",
+    "law_code": "PEN",
+    "section_num": "187",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "pen-no-marker",
+    "input": "Penal Code 187",
+    "law_code": "PEN",
+    "section_num": "187",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "pen-spelled-section",
+    "input": "Penal Code section 187",
+    "law_code": "PEN",
+    "section_num": "187",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "pen-sec-abbrev",
+    "input": "Penal Code sec. 187",
+    "law_code": "PEN",
+    "section_num": "187",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "bpc-ampersand-bluebook",
+    "input": "Cal. Bus. & Prof. Code § 17200",
+    "law_code": "BPC",
+    "section_num": "17200",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "bpc-no-cal-prefix",
+    "input": "Bus. & Prof. Code § 17200",
+    "law_code": "BPC",
+    "section_num": "17200",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "evid-bluebook",
+    "input": "Cal. Evid. Code § 1101",
+    "law_code": "EVID",
+    "section_num": "1101",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "fam-bluebook",
+    "input": "Cal. Fam. Code § 297",
+    "law_code": "FAM",
+    "section_num": "297",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "gov-suffixed",
+    "input": "Cal. Gov't Code § 65000",
+    "law_code": "GOV",
+    "section_num": "65000",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "gov-no-apostrophe",
+    "input": "Gov. Code § 65000",
+    "law_code": "GOV",
+    "section_num": "65000",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "veh-bluebook",
+    "input": "Cal. Veh. Code § 23152",
+    "law_code": "VEH",
+    "section_num": "23152",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "veh-with-subdiv-a",
+    "input": "Veh. Code § 23152(a)",
+    "law_code": "VEH",
+    "section_num": "23152",
+    "subsection_path": ["a"],
+    "confidence": "high"
+  },
+  {
+    "id": "hsc-suffixed-num",
+    "input": "Cal. Health & Safety Code § 11350",
+    "law_code": "HSC",
+    "section_num": "11350",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "wic-bluebook",
+    "input": "Cal. Welf. & Inst. Code § 5150",
+    "law_code": "WIC",
+    "section_num": "5150",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "lab-spelled-out",
+    "input": "Labor Code section 226",
+    "law_code": "LAB",
+    "section_num": "226",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "ins-spelled",
+    "input": "Insurance Code section 790.03",
+    "law_code": "INS",
+    "section_num": "790.03",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "rtc-suffixed",
+    "input": "Rev. & Tax. Code § 17041",
+    "law_code": "RTC",
+    "section_num": "17041",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "edc-bluebook",
+    "input": "Cal. Educ. Code § 48900",
+    "law_code": "EDC",
+    "section_num": "48900",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "prc-bluebook",
+    "input": "Cal. Pub. Res. Code § 21080.5",
+    "law_code": "PRC",
+    "section_num": "21080.5",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "prob-spelled",
+    "input": "Probate Code section 21610",
+    "law_code": "PROB",
+    "section_num": "21610",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "double-section-marker",
+    "input": "Cal. Civ. Code §§ 1714(a)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["a"],
+    "confidence": "high"
+  },
+  {
+    "id": "subdiv-comma-pattern",
+    "input": "Veh. Code, § 23152, subd. (a)",
+    "law_code": "VEH",
+    "section_num": "23152",
+    "subsection_path": ["a"],
+    "confidence": "high"
+  },
+  {
+    "id": "subdiv-glued-deep",
+    "input": "Pen. Code § 1170(h)(3)(A)",
+    "law_code": "PEN",
+    "section_num": "1170",
+    "subsection_path": ["h", "3", "A"],
+    "confidence": "high"
+  },
+  {
+    "id": "ambiguous-cc-civ",
+    "input": "CC § 1714",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "ambiguous-pc-pen",
+    "input": "PC § 187",
+    "law_code": "PEN",
+    "section_num": "187",
+    "subsection_path": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "ambiguous-vc-veh",
+    "input": "VC § 23152",
+    "law_code": "VEH",
+    "section_num": "23152",
+    "subsection_path": null,
+    "confidence": "medium"
+  },
+  {
+    "id": "lowercase-input",
+    "input": "cal. civ. code § 1714",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "extra-internal-whitespace",
+    "input": "Cal.   Civ.   Code   §   1714",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "trailing-period",
+    "input": "Cal. Civ. Code § 1714.",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "sentence-prefix-the",
+    "input": "the Civil Code section 1714",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": null,
+    "confidence": "high"
+  },
+  {
+    "id": "subsection-multi-letter-Aa",
+    "input": "Cal. Civ. Code § 1714(aa)",
+    "law_code": "CIV",
+    "section_num": "1714",
+    "subsection_path": ["aa"],
+    "confidence": "high"
+  },
+  {
+    "id": "subsection-3digit",
+    "input": "Cal. Educ. Code § 48900(b)(123)",
+    "law_code": "EDC",
+    "section_num": "48900",
+    "subsection_path": ["b", "123"],
+    "confidence": "high"
+  }
+]
