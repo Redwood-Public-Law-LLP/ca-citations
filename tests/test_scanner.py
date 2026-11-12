@@ -866,3 +866,64 @@ def test_another_states_code_does_not_take_the_documents_default_either() -> Non
     assert [(r.law_code, r.section_num, r.attribution) for r in scan(text)] == [
         ("PEN", "187", "document_default")
     ]
+
+
+# --- which constitution, and whose article (2026-11-11) -----------------------
+#
+# Appellate opinions cite the federal Constitution, whose articles are
+# numbered like California's, and city charters, bylaws, and plans, which have
+# articles too. Every sentence here is invented.
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(U.S. Const., art. I, § 10.)",
+        "the commerce clause (U.S. Const., art. I, § 8, cl. 3) was not alleged",
+        "article I, section 8 of the United States Constitution",
+        "section 8 of article I of the United States Constitution",
+        "article III, section 2 of the federal Constitution",
+        "article I, section 10 of the Constitution of the United States",
+    ],
+)
+def test_the_federal_constitution_is_not_the_california_constitution(text: str) -> None:
+    assert scan(text) == []
+
+
+def test_a_federal_mention_does_not_make_a_later_bare_article_californias() -> None:
+    text = "The United States Constitution controls. Under art. I, § 10, no state may do so."
+    assert scan(text) == []
+
+
+def test_a_california_cite_beside_a_federal_one_is_still_found() -> None:
+    text = "(U.S. Const., 14th Amend., § 1; Cal. Const., art. I, § 7.)"
+    assert [(r.law_code, r.article, r.section_num, r.attribution) for r in scan(text)] == [
+        ("CONS", "I", "7", "named")
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(Cal. Const., art. VI, § 4½.)",
+        "(Cal. Const., art. VI, § 4 1/2.)",
+        "(Const., art. VI, sec. 41/2.)",
+        "under article VI, section 4% of the Constitution",
+    ],
+)
+def test_a_section_with_a_fraction_is_not_the_whole_numbered_section(text: str) -> None:
+    """Section 4½ is a different provision from section 4."""
+    assert scan(text) == []
+
+
+@pytest.mark.parametrize(
+    "text,section",
+    [
+        ("attempted robbery (Pen. Code, §§ 664/211)", "664"),
+        ("residential burglary (Pen. Code, §§ 459/460, subd. (a))", "459"),
+    ],
+)
+def test_a_slash_between_two_sections_is_not_a_fraction(text: str, section: str) -> None:
+    """'§§ 664/187' pairs attempt with the offense attempted. The first section
+    is still cited, as before."""
+    assert [(r.law_code, r.section_num) for r in scan(text)][:1] == [("PEN", section)]

@@ -440,3 +440,84 @@ def test_plural_lists_are_indexed_as_before() -> None:
     assert sorted((c.code, c.section) for c in extract("Penal Code sections 2, 235 and 240")) == [
         ("PEN", "2"), ("PEN", "235"), ("PEN", "240"),
     ]
+
+
+# --- which constitution, and whose article (2026-11-11) -----------------------
+# Every sentence is invented.
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "(U.S. Const., art. I, § 10.)",
+        "article I, section 8 of the United States Constitution",
+        "the supremacy clause of article VI of the United States Constitution",
+        "the case and controversy language of article III of the federal Constitution",
+        "By section 3 of article III of the constitution of the United States it is provided",
+        "under the United States Constitution (art. IV), and that the judgment",
+    ],
+)
+def test_federal_constitution_articles_are_not_indexed(text: str) -> None:
+    assert extract(text) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "By article VI of the city charter, a department was created.",
+        "the county has, in article VII of its charter, provided for a board",
+        "jurisdiction was retained in article XIV of the reorganization plan",
+        "Medical Staff Bylaws (1971) art. III, § 2(a), p. 7.",
+        "sections 82.04 and 82.05 of chapter 8, article II, and sections 86.11",
+    ],
+)
+def test_an_article_of_some_other_document_is_not_indexed(text: str) -> None:
+    assert extract(text) == []
+
+
+def test_a_bare_numbered_article_is_not_indexed() -> None:
+    """Nothing in the sentence says whose article IV this is. A lost cite, by
+    design: precision beats recall for anything persisted."""
+    assert extract("article IV, section 1, relating to the initiative power") == []
+
+
+@pytest.mark.parametrize(
+    "text,key",
+    [
+        ("(Cal. Const., art. XIII D, § 6, subd. (b).)", "XIII D-6"),
+        ("article I, section 7 of the California Constitution", "I-7"),
+        ("The California Constitution (art. I, § 8) forbids it.", "I-8"),
+        ("section 6 of article XI of the Constitution", "XI-6"),
+        ("(Const., art. XI, sec. 8)", "XI-8"),
+        ("article XVIII, section 3, of the Constitution expressly declares", "XVIII-3"),
+        ("article XI, section 7 of the state Constitution", "XI-7"),
+        ("article XIII A, section 3, subdivision (b), of the Constitution", "XIII A-3"),
+        # A lettered article needs no name beside it.
+        ("special taxes under article XIII A, section 4", "XIII A-4"),
+        ("the voter-approval requirements of article XIII C apply", "XIII C"),
+        # Beside a federal cite, the California one is still indexed.
+        ("(U.S. Const., 14th Amend., § 1; Cal. Const., art. I, § 7.)", "I-7"),
+        ("(Cal. Const., art. I, § 19; U.S. Const., 4th Amend.)", "I-19"),
+    ],
+)
+def test_california_constitution_cites_are_still_indexed(text: str, key: str) -> None:
+    assert [(c.code, c.section) for c in extract(text)] == [("CONS", key)]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "a miscarriage of justice. (Cal. Const., art. VI, § 4½.)",
+        "under section 4 1/2 of article VI of the Constitution",
+        "(Const., art. VI, sec. 41/2.)",
+    ],
+)
+def test_a_fractional_section_is_indexed_at_the_article_only(text: str) -> None:
+    """The article is certain; the whole-numbered section would be wrong."""
+    assert [(c.code, c.section) for c in extract(text)] == [("CONS", "VI")]
+
+
+def test_a_lettered_constitution_section_keeps_its_letter() -> None:
+    """Section 1a is not section 1."""
+    got = [(c.code, c.section) for c in extract("by article VI, section 1a, of the Constitution")]
+    assert got == [("CONS", "VI-1a")]

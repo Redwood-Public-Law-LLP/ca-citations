@@ -48,7 +48,12 @@ from dataclasses import dataclass
 
 from ca_citations.codes import resolve_code
 from ca_citations.reporter import REPORTER_RX, is_known
-from ca_citations.scanner import _walk_backward_for_code, not_a_california_number
+from ca_citations.scanner import (
+    _FRACTION_AFTER_RE,
+    _walk_backward_for_code,
+    is_federal_constitution,
+    not_a_california_number,
+)
 
 # --- California Code of Regulations -----------------------------------------
 # Lifted from the CCR verification script. Three orderings occur in practice:
@@ -345,6 +350,66 @@ def find_section_lists(text: str, default_code: str | None = None) -> list[Extra
     return out
 
 
+# --- Whose article is it? ----------------------------------------------------
+#
+# "article VI" is how city charters, bylaws, plans, and the federal
+# Constitution number their parts too. In advisory opinions a bare article is
+# nearly always the California Constitution; in appellate opinions it often is
+# not ("By article VI of this charter", "the supremacy clause of article VI").
+# So an article is kept only when the text says whose it is:
+#
+#   1. a constitution is named with it, in the same sentence, and it is not
+#      the federal one; or
+#   2. the article has a letter ("XIII A", "XIII D"), a form the federal
+#      Constitution never has and other documents rarely do.
+#
+# and never when the words after it name some other document.
+
+_CONST_WORD = re.compile(r"\bConst(?:\.|itutions?\b)", re.IGNORECASE)
+# How far a sentence is searched for the constitution's name.
+_NAME_WINDOW = 90
+# A sentence end, not the period of "subd.", "art.", "sec.", "cl." or "par.".
+_SENTENCE_END = re.compile(
+    r"(?<!subd)(?<!subds)(?<!art)(?<!sec)(?<!secs)(?<!cl)(?<!par)(?<!Cal)(?<!Const)"
+    r"[.;](?=\s|\)|\]|$)"
+)
+# Between a constitution's name and the article after it: "Cal. Const.,
+# art. I", "the California Constitution (art. I, § 8)".
+_ONLY_PUNCTUATION = re.compile(r"[\s,(\[]*")
+# Before a constitution's name after the article: "... of the California
+# Constitution", "art. VI, Constitution of California".
+_LEADS_TO_NAME = re.compile(
+    r"(?:\bof\s+(?:the\s+|our\s+|said\s+|this\s+)?[\w.\s]{0,22}|,\s*)$"
+)
+_OTHER_DOCUMENT = re.compile(
+    r"\s*,?\s*of\s+(?:the|this|its|that|said|such|their|a|an)\s+(?:[\w'’.-]+\s+){0,4}?"
+    r"(?:charter|by-?laws|plan|agreement|contract|lease|treaty|ordinance|compact|"
+    r"convention|covenants?|declaration|policy|rules|regulations|code|act)\b",
+    re.IGNORECASE,
+)
+
+
+def _constitution_named(text: str, start: int, end: int) -> str | None:
+    """'california', 'federal', or None: the constitution named in the same
+    sentence as the article at text[start:end], nearest first."""
+    # Directly before: "Cal. Const., art. I", "Constitution (art. I, § 8)".
+    lo = max(0, start - 40)
+    before = [m for m in _CONST_WORD.finditer(text, lo, start)
+              if _ONLY_PUNCTUATION.fullmatch(text, m.end(), start)]
+    if before:
+        m = before[-1]
+        return "federal" if is_federal_constitution(text, m.start(), m.end()) else "california"
+    # After, in the same sentence: "article XIII D, section 6, of the
+    # California Constitution".
+    stop = _SENTENCE_END.search(text, end, end + _NAME_WINDOW)
+    hi = stop.start() if stop else min(len(text), end + _NAME_WINDOW)
+    for m in _CONST_WORD.finditer(text, end, hi):
+        if not _LEADS_TO_NAME.search(text, end, m.start()):
+            continue
+        return "federal" if is_federal_constitution(text, m.start(), m.end()) else "california"
+    return None
+
+
 def find_constitution(text: str) -> list[ExtraCite]:
     """California Constitution articles, with a section where one is given.
 
@@ -361,6 +426,16 @@ def find_constitution(text: str) -> list[ExtraCite]:
         # "XIIIA" written without a space is the same article as "XIII A".
         art = re.sub(r"^([IVXL]+)([A-D])$", r"\1 \2", art)
         section = m.group("section")
+        end = m.end()
+        if section and (_FRACTION_AFTER_RE.match(text, end) or text[end:end + 1].isalpha()):
+            # "art. VI, § 4½" is not section 4, and "§ 1a" is not section 1 (nor
+            # is OCR's "2y2" section 2): keep the article, not the section.
+            section, end = None, m.end("article")
+        named = _constitution_named(text, m.start(), end)
+        if named == "federal" or _OTHER_DOCUMENT.match(text, end):
+            continue
+        if named is None and " " not in art:
+            continue  # a bare "article VI": the text does not say whose
         out.append(
             ExtraCite(
                 code="CONS",

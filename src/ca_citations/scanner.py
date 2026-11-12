@@ -375,6 +375,39 @@ _CONST_AFTER_RE = re.compile(
 # "art. XIII D, § 6" short form.
 _CONST_MENTION_RE = re.compile(r"\b" + _CONST_NAME)
 
+# Which constitution? "U.S. Const., art. I, § 10", "article VI of the United
+# States Constitution", "article III of the federal Constitution", and "the
+# constitution of the United States" name the federal one. Its articles are
+# numbered like California's, so the qualifier is the only thing that tells
+# them apart, and a federal cite must never be stored as a California one.
+_FEDERAL_BEFORE_RE = re.compile(
+    r"(?:\bU\.\s?S\.|\bUnited\s+States|\b[Ff]ederal|\bFed\.)\s*$"
+)
+_FEDERAL_AFTER_RE = re.compile(r"\s+of\s+(?:the\s+)?United\s+States\b")
+# "... of the United States Constitution" / "of the federal Constitution",
+# directly after a section number or an article.
+_FEDERAL_CONST_AFTER_RE = re.compile(
+    r"\s*,?\s*(?i:of\s+)?(?i:the\s+)?"
+    r"(?:U\.\s?S\.|United\s+States|[Ff]ederal|Fed\.)\s+(?i:Const(?:\.|itution\b))"
+)
+
+
+def is_federal_constitution(text: str, start: int, end: int) -> bool:
+    """Is the "Const." / "Constitution" at text[start:end] the federal one?"""
+    return (
+        _FEDERAL_BEFORE_RE.search(text, max(0, start - 20), start) is not None
+        or _FEDERAL_AFTER_RE.match(text, end) is not None
+    )
+
+
+# A section number followed by a fraction is a different section: old
+# opinions cite "art. VI, § 4½" (also printed "4 1/2" or "41/2", and read by
+# OCR as "4%"), which is not section 4. The whole number cannot be told from
+# the text, so the anchor is skipped rather than stored under the wrong section.
+# A slash before a longer number is not a fraction: "Pen. Code, §§ 664/187"
+# pairs attempt with the offense attempted, and stays a cite to section 664.
+_FRACTION_AFTER_RE = re.compile(r"\s?(?:[\u00bc-\u00be]|[1-3]/[2-4](?!\d))|%|/[2-4](?!\d)")
+
 _CONST_INFERRED_WARNING = (
     "article attributed to the California Constitution from an earlier "
     "mention of the Constitution in the text"
@@ -683,9 +716,15 @@ def _attribute_constitution(
     if back is not None:
         article = " ".join(back.group("article").split())
         if back.group("const"):
+            if is_federal_constitution(text, back.start("const"), back.end("const")):
+                return False  # "U.S. Const., art. I, § 10"
             return _Attribution("CONS", back.start(), subsection_end, article=article)
+        if _FEDERAL_CONST_AFTER_RE.match(text, subsection_end):
+            return False  # "article I, section 8 of the United States Constitution"
         after = _CONST_AFTER_RE.match(text, subsection_end)
         if after is not None:
+            if _FEDERAL_AFTER_RE.match(text, after.end()):
+                return False  # "... of the Constitution of the United States"
             return _Attribution("CONS", back.start(), after.end(), article=article)
         if const_seen:
             return _Attribution(
@@ -702,6 +741,10 @@ def _attribute_constitution(
     fwd = _CONST_FORWARD_RE.match(text, subsection_end)
     if fwd is not None:
         article = " ".join(fwd.group("article").split())
+        if _FEDERAL_CONST_AFTER_RE.match(text, fwd.end("article")) or (
+            fwd.group("tail") and _FEDERAL_AFTER_RE.match(text, fwd.end())
+        ):
+            return False  # "section 8 of article I of the United States Constitution"
         if fwd.group("tail"):
             return _Attribution("CONS", anchor.start(), fwd.end(), article=article)
         if const_seen:
@@ -758,13 +801,20 @@ def scan(
     mentions = _find_code_mentions(text)
     mention_ends = [end for end, _ in mentions]
     declared = _statutory_defaults(text)
-    const_positions = [m.start() for m in _CONST_MENTION_RE.finditer(text)]
+    # Mentions of the federal Constitution do not make a later bare article
+    # a California one.
+    const_positions = [
+        m.start() for m in _CONST_MENTION_RE.finditer(text)
+        if not is_federal_constitution(text, m.start(), m.end())
+    ]
 
     for anchor in _ANCHOR_RE.finditer(text):
         if _SPLIT_NUMBER_RE.match(text, anchor.end()):
             continue  # "Sections 8 1000": an OCR-split number, not § 8
         if not_a_california_number(text, anchor.group("marker"), anchor.start("num")):
             continue  # "section 2,235", "§ 9-318": not a California section number
+        if _FRACTION_AFTER_RE.match(text, anchor.end()):
+            continue  # "§ 4½": a different section from § 4
         # Greedy forward extension for trailing subdivisions / subd. text.
         subsection_end = anchor.end()
         fwd = _FORWARD_RE.match(text, subsection_end)
