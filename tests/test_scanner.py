@@ -751,3 +751,118 @@ def test_sentence_ending_inside_parentheses_does_not_block_a_bare_cite() -> None
 
 def test_year_parenthetical_still_blocks_a_bare_cite() -> None:
     assert scan("Corbin on Contracts (2024) § 4.5 explains", default_law_code="GOV") == []
+
+
+# --- other bodies of law that share a California code's name (2026-11-11) -----
+#
+# Found indexing appellate opinions, which cite other states' codes, model
+# codes, and uniform acts far more often than advisory opinions do. Every
+# sentence here is invented; each has the form that occurs.
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The court applied Texas Penal Code section 19.02.",
+        "See Texas Government Code section 311.021.",
+        "the New York Penal Code, section 1050, provides",
+        "the North Carolina Evidence Code section 403",
+        "(Tex. Pen. Code, § 19.02.)",
+        "citing Draft N.Y. Civ. Code, § 97",
+        "the French Civil Code, section 1382",
+    ],
+)
+def test_another_jurisdictions_code_is_not_a_california_code(text: str) -> None:
+    assert scan(text) == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Model Penal Code section 2.02 defines purpose.",
+        "(Model Pen. Code, § 2.02, subd. (2)(a).)",
+    ],
+)
+def test_a_model_code_is_not_a_california_code(text: str) -> None:
+    assert scan(text) == []
+
+
+def test_a_uniform_act_is_not_a_california_code() -> None:
+    assert scan("the Uniform Probate Code section 503 says otherwise") == []
+
+
+@pytest.mark.parametrize(
+    "text,section",
+    [
+        ("Uniform Commercial Code section 2207 governs.", "2207"),
+        ("California Uniform Commercial Code section 9403 applies.", "9403"),
+        ("(Cal. U. Com. Code, § 2207.)", "2207"),
+    ],
+)
+def test_the_uniform_commercial_code_is_californias_commercial_code(
+    text: str, section: str
+) -> None:
+    """California enacted it as the Commercial Code, and courts cite it both ways."""
+    assert [(r.law_code, r.section_num, r.attribution) for r in scan(text)] == [
+        ("COM", section, "named")
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Uniform Commercial Code section 2-207 governs the forms.",
+        "Uniform Probate Code section 2-503 excuses the defect.",
+        "(U. Com. Code, § 2-207.)",
+        "(U. Com. Code, §§ 2-314, 2-315.)",
+        "see also Com. Code, § 9-318, subd. (4).",
+    ],
+)
+def test_an_article_and_section_number_is_not_a_range(text: str) -> None:
+    """'2-207' is one section of a uniform act, not sections 2 through 207."""
+    assert scan(text) == []
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Gov. Code sections 54950-54962 apply.", ("GOV", "54950", "54962")),
+        ("sections 71-73 of the Streets and Highways Code", ("SHC", "71", "73")),
+        ("(Welf. & Inst. Code, § 4620-4636.)", ("WIC", "4620", "4636")),
+    ],
+)
+def test_real_ranges_are_still_ranges(text: str, expected: tuple[str, str, str]) -> None:
+    assert [(r.law_code, r.section_num, r.range_end) for r in scan(text)] == [expected]
+
+
+def test_a_number_with_a_thousands_comma_is_not_two_sections() -> None:
+    assert scan("He was charged under Penal Code section 2,235.") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["(Pen. Code, §§ 187, 190.)", "(Pen. Code, §§ 187,190.)"],
+)
+def test_a_plural_list_is_still_a_list_with_or_without_a_space(text: str) -> None:
+    assert [(r.law_code, r.section_num) for r in scan(text)] == [("PEN", "187"), ("PEN", "190")]
+
+
+def test_a_place_name_before_a_parenthetical_cite_is_not_a_jurisdiction() -> None:
+    results = scan("He blocked traffic on Washington (Veh. Code, § 21453, subd. (a)).")
+    assert [(r.law_code, r.section_num) for r in results] == [("VEH", "21453")]
+
+
+def test_a_state_name_ending_the_previous_sentence_is_not_a_qualifier() -> None:
+    results = scan("He moved to Texas. Penal Code section 187 still applied.")
+    assert [(r.law_code, r.section_num) for r in results] == [("PEN", "187")]
+
+
+def test_another_states_code_does_not_take_the_documents_default_either() -> None:
+    """The cite to the other state's code is dropped, not handed to the default."""
+    text = (
+        "All further statutory references are to the Penal Code. "
+        "Texas Penal Code section 19.02 differs. Section 187 applies."
+    )
+    assert [(r.law_code, r.section_num, r.attribution) for r in scan(text)] == [
+        ("PEN", "187", "document_default")
+    ]

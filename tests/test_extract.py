@@ -405,3 +405,38 @@ def test_id_pointing_at_the_default_code_is_still_a_bare_default_cite() -> None:
 
 def test_code_named_in_the_previous_sentence_is_not_indexed() -> None:
     assert codes("We look to the Government Code. (§ 54953.)") == set()
+
+
+# --- other bodies of law that share a California code's name (2026-11-11) -----
+# The index must hold none of these. Every sentence is invented.
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The court applied Texas Penal Code section 19.02.",
+        "See Texas Government Code section 311.021.",
+        "Model Penal Code section 2.02 defines purpose.",
+        "Uniform Commercial Code section 2-207 governs the forms.",
+        "Uniform Probate Code section 2-503 excuses the defect.",
+        "He was charged under Penal Code section 2,235.",
+    ],
+)
+def test_cites_to_other_law_are_not_indexed(text: str) -> None:
+    assert extract(text) == []
+
+
+def test_californias_commercial_code_is_indexed_under_either_name() -> None:
+    text = (
+        "Uniform Commercial Code section 2207 governs; see also California "
+        "Uniform Commercial Code section 9403 and Cal. U. Com. Code, § 2314."
+    )
+    assert sorted((c.code, c.section) for c in extract(text)) == [
+        ("COM", "2207"), ("COM", "2314"), ("COM", "9403"),
+    ]
+
+
+def test_plural_lists_are_indexed_as_before() -> None:
+    assert sorted((c.code, c.section) for c in extract("Penal Code sections 2, 235 and 240")) == [
+        ("PEN", "2"), ("PEN", "235"), ("PEN", "240"),
+    ]

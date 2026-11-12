@@ -48,7 +48,7 @@ from dataclasses import dataclass
 
 from ca_citations.codes import resolve_code
 from ca_citations.reporter import REPORTER_RX, is_known
-from ca_citations.scanner import _walk_backward_for_code
+from ca_citations.scanner import _walk_backward_for_code, not_a_california_number
 
 # --- California Code of Regulations -----------------------------------------
 # Lifted from the CCR verification script. Three orderings occur in practice:
@@ -305,6 +305,9 @@ def find_section_lists(text: str, default_code: str | None = None) -> list[Extra
         nums = m.group("nums")
         if not _SPLIT.search(nums) and not _DASH.search(nums):
             continue  # singular -- the scanner already has it
+        marker = text[m.start():m.start("nums")].strip()
+        if not_a_california_number(text, marker, m.start("nums")):
+            continue  # "section 2,235", "§ 9-318": see the scanner
 
         # Resolve the code: prefer a trailing "of the X Code", else walk back.
         code = None

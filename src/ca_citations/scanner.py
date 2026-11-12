@@ -90,6 +90,30 @@ _UNIT_AFTER_RE = re.compile(
 _YEAR_RE = re.compile(r"(?:19|20)\d\d")
 
 
+# Two ways of writing a number that California section numbers never use, so
+# an anchor written either way does not cite a California section:
+#
+#   "section 2,235"  one number with a thousands comma, not sections 2 and
+#                    235. Only after a singular marker: "§§ 187,190" is a list.
+#   "§ 9-318"        an article-and-section number, as uniform acts and many
+#                    municipal codes write them ("Uniform Commercial Code
+#                    section 2-207", "Sec. 27-77"), not a range from 9 to 318.
+#                    The shape is a one- or two-digit number joined by a bare
+#                    hyphen to a longer one. A real range of that shape
+#                    ("§§ 51-100") is lost with it; "sections 71-73",
+#                    "§§ 54950-54962", and every "to"/"through" range are not.
+_GROUPED_NUMBER_RE = re.compile(r"\d{1,3},\d{3}(?![\d,])")
+_ARTICLE_SECTION_NUMBER_RE = re.compile(r"\d{1,2}[-\u2010-\u2015]\d{3,}")
+
+
+def not_a_california_number(text: str, marker: str, num_start: int) -> bool:
+    """Is the number at `num_start` written in a form no California section
+    number takes? `marker` is the section marker before it ("§", "sections")."""
+    if _ARTICLE_SECTION_NUMBER_RE.match(text, num_start):
+        return True
+    return not _is_plural_marker(marker) and bool(_GROUPED_NUMBER_RE.match(text, num_start))
+
+
 def _plausible_range(start: str, end: str, text: str, end_pos: int) -> bool:
     """Can `end` close a range of sections that opens at `start`?"""
     start_digits = re.match(r"\d+", start)
@@ -182,11 +206,67 @@ def _tokens_in(text: str, lo: int, hi: int) -> list[tuple[int, int]]:
     return tokens
 
 
+# Words that, directly before a code name, make it some other body of law:
+# "Texas Penal Code", "N.Y. Civ. Code", "Model Penal Code", "Uniform Probate
+# Code". Many states name their codes as California does, so the name alone
+# does not say whose code it is. Full names are matched as bare words;
+# abbreviations as written, with their periods.
+_OTHER_JURISDICTIONS = frozenset({
+    # the other states, the District, and the territories
+    "Alabama", "Alaska", "Arizona", "Arkansas", "Colorado", "Connecticut", "Delaware",
+    "District of Columbia", "Florida", "Georgia", "Guam", "Hawaii", "Idaho", "Illinois",
+    "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland",
+    "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana",
+    "Nebraska", "Nevada", "New Hampshire", "New Jersey", "New Mexico", "New York",
+    "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania",
+    "Puerto Rico", "Rhode Island", "South Carolina", "South Dakota", "Tennessee", "Texas",
+    "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming",
+    # their usual abbreviations
+    "Ala.", "Ariz.", "Ark.", "Colo.", "Conn.", "Del.", "D.C.", "Fla.", "Ga.", "Haw.",
+    "Ill.", "Ind.", "Kan.", "Ky.", "La.", "Me.", "Md.", "Mass.", "Mich.", "Minn.", "Miss.",
+    "Mo.", "Mont.", "Neb.", "Nev.", "N.H.", "N.J.", "N.M.", "N.Y.", "N.C.", "N.D.",
+    "Okla.", "Or.", "Ore.", "Pa.", "R.I.", "S.C.", "S.D.", "Tenn.", "Tex.", "Vt.", "Va.",
+    "Wash.", "W.Va.", "Wis.", "Wyo.",
+    # other countries' codes that share a name with a California code
+    "French", "German", "Mexican", "Philippine", "Spanish", "Swiss",
+})
+_MODEL_QUALIFIERS = frozenset({"Model"})
+# "Uniform" names a uniform act, with one exception: California enacted the
+# Uniform Commercial Code as its Commercial Code and courts cite it both ways
+# ("California Uniform Commercial Code section 9403", "Cal. U. Com. Code,
+# § 2207"). Its hyphenated uniform-act sections are refused by number shape
+# (`not_a_california_number`), not here.
+_UNIFORM_QUALIFIERS = frozenset({"Uniform", "U."})
+_OPENERS = "([{\"'\u201c\u2018"
+
+
+def _names_other_law(text: str, before: list[tuple[int, int]], name_start: int,
+                     entry: CodeEntry) -> bool:
+    """Is the code name starting at `name_start` qualified, by the words just
+    before it, as another jurisdiction's code, a model code, or a uniform act?
+
+    `before` holds the tokens that precede the name. A name that opens a
+    parenthetical or a quotation is not qualified by what came before it: in
+    "on Washington (Veh. Code, § 21453)" the street is not a jurisdiction.
+    """
+    if not before or text[name_start] in _OPENERS:
+        return False
+    words = [text[a:b].lstrip(_OPENERS) for a, b in before[-3:]]
+    last = words[-1]
+    if last in _MODEL_QUALIFIERS:
+        return True
+    if last in _UNIFORM_QUALIFIERS:
+        return entry.law_code != "COM"
+    return any(" ".join(words[-n:]) in _OTHER_JURISDICTIONS for n in (1, 2, 3))
+
+
 def _walk_backward_for_code(text: str, end: int) -> tuple[CodeEntry, int] | None:
     """Find the longest token-run ending at `end` that resolves to a code.
 
     Looks back at most `_BACKWARD_WINDOW` characters. Returns
-    (entry, start_offset) on success, None otherwise.
+    (entry, start_offset) on success, None otherwise: also when the name found
+    is qualified as some other body of law ("Texas Penal Code", "Model Penal
+    Code"), which is not a California code however it resolves.
     """
     tokens = _tokens_in(text, max(0, end - _BACKWARD_WINDOW), end)
     if not tokens:
@@ -207,6 +287,8 @@ def _walk_backward_for_code(text: str, end: int) -> tuple[CodeEntry, int] | None
             continue
         entry = resolve_code(candidate)
         if entry is not None:
+            if _names_other_law(text, tokens[:-n], start, entry):
+                return None
             return entry, start
     return None
 
@@ -681,6 +763,8 @@ def scan(
     for anchor in _ANCHOR_RE.finditer(text):
         if _SPLIT_NUMBER_RE.match(text, anchor.end()):
             continue  # "Sections 8 1000": an OCR-split number, not § 8
+        if not_a_california_number(text, anchor.group("marker"), anchor.start("num")):
+            continue  # "section 2,235", "§ 9-318": not a California section number
         # Greedy forward extension for trailing subdivisions / subd. text.
         subsection_end = anchor.end()
         fwd = _FORWARD_RE.match(text, subsection_end)
