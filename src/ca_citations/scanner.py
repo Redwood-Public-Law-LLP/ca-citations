@@ -114,6 +114,35 @@ def not_a_california_number(text: str, marker: str, num_start: int) -> bool:
     return not _is_plural_marker(marker) and bool(_GROUPED_NUMBER_RE.match(text, num_start))
 
 
+# A footnote number printed against a section number. Text taken from a
+# court's PDF has lost the superscript, so "section 1382.[fn 2] Petitioners"
+# reads "section 1382.2 Petitioners": § 1382.2, which the document did not
+# cite. Two shapes, each followed by a capitalized word:
+#
+#   "section 1382.2 Petitioners"  a number whose last part is a single digit
+#                                 after a period.
+#   "§§ 459, 1 Because"           a list member of one or two digits
+#                                 ("section 11580, 2 Smith", "§ 12940,1 Smith").
+#
+# The footnote digit cannot be told from a real decimal part, so the number is
+# not cited at all rather than cut back to § 1382. Members of the list before
+# it stay. Cost: a real one-digit decimal section followed by a capitalized
+# word, as in a heading ("Civil Code Section 1942.1 In one sentence"), is lost.
+_DECIMAL_FOOTNOTE_NUM_RE = re.compile(r"\d+(?:\.\d+)*\.\d")
+_LIST_FOOTNOTE_NUM_RE = re.compile(r"\d{1,2}")
+_CAPITALIZED_WORD_AFTER_RE = re.compile(r"[ \t]+[A-Z]")
+
+
+def footnote_against_number(text: str, num: str, num_end: int, list_member: bool) -> bool:
+    """Is `num`, ending at `num_end`, a section number with a footnote number
+    run into it? `list_member` is True for a number after the first in a list."""
+    if _CAPITALIZED_WORD_AFTER_RE.match(text, num_end) is None:
+        return False
+    if _DECIMAL_FOOTNOTE_NUM_RE.fullmatch(num):
+        return True
+    return list_member and _LIST_FOOTNOTE_NUM_RE.fullmatch(num) is not None
+
+
 def _plausible_range(start: str, end: str, text: str, end_pos: int) -> bool:
     """Can `end` close a range of sections that opens at `start`?"""
     start_digits = re.match(r"\d+", start)
@@ -380,22 +409,30 @@ _CONST_MENTION_RE = re.compile(r"\b" + _CONST_NAME)
 # constitution of the United States" name the federal one. Its articles are
 # numbered like California's, so the qualifier is the only thing that tells
 # them apart, and a federal cite must never be stored as a California one.
+#
+# A reporter page can turn inside the name, and CourtListener marks the page
+# inline ("constitution of the United *764 States"), so a space between the
+# words may hold a page marker.
+_GAP = r"(?:\s+\*{1,2}\d+)?\s+"
 _FEDERAL_BEFORE_RE = re.compile(
-    r"(?:\bU\.\s?S\.|\bUnited\s+States|\b[Ff]ederal|\bFed\.)\s*$"
+    r"(?:\bU\.\s?S\.|\bUnited" + _GAP + r"States|\b[Ff]ederal|\bFed\.)\s*$"
 )
-_FEDERAL_AFTER_RE = re.compile(r"\s+of\s+(?:the\s+)?United\s+States\b")
+_FEDERAL_AFTER_RE = re.compile(
+    _GAP + r"of" + _GAP + r"(?:the" + _GAP + r")?United" + _GAP + r"States\b"
+)
 # "... of the United States Constitution" / "of the federal Constitution",
 # directly after a section number or an article.
 _FEDERAL_CONST_AFTER_RE = re.compile(
-    r"\s*,?\s*(?i:of\s+)?(?i:the\s+)?"
-    r"(?:U\.\s?S\.|United\s+States|[Ff]ederal|Fed\.)\s+(?i:Const(?:\.|itution\b))"
+    r"\s*,?\s*(?i:of" + _GAP + r")?(?i:the" + _GAP + r")?"
+    r"(?:U\.\s?S\.|United" + _GAP + r"States|[Ff]ederal|Fed\.)" + _GAP
+    + r"(?i:Const(?:\.|itution\b))"
 )
 
 
 def is_federal_constitution(text: str, start: int, end: int) -> bool:
     """Is the "Const." / "Constitution" at text[start:end] the federal one?"""
     return (
-        _FEDERAL_BEFORE_RE.search(text, max(0, start - 20), start) is not None
+        _FEDERAL_BEFORE_RE.search(text, max(0, start - 30), start) is not None
         or _FEDERAL_AFTER_RE.match(text, end) is not None
     )
 
@@ -593,6 +630,10 @@ def _collect_continuations(
             match = _LIST_CONT_RE.match(text, pos)
         if match is None:
             break
+        if not is_range and footnote_against_number(
+            text, match.group("num"), match.end("num"), list_member=True
+        ):
+            break  # "§§ 459, 1 Because": a footnote number, not a section
 
         item_end = match.end()
         fwd = _FORWARD_RE.match(text, item_end)
@@ -815,6 +856,8 @@ def scan(
             continue  # "section 2,235", "§ 9-318": not a California section number
         if _FRACTION_AFTER_RE.match(text, anchor.end()):
             continue  # "§ 4½": a different section from § 4
+        if footnote_against_number(text, anchor.group("num"), anchor.end("num"), False):
+            continue  # "section 1382.2 Petitioners": a footnote run into § 1382
         # Greedy forward extension for trailing subdivisions / subd. text.
         subsection_end = anchor.end()
         fwd = _FORWARD_RE.match(text, subsection_end)

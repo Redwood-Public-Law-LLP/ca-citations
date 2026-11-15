@@ -51,6 +51,7 @@ from ca_citations.reporter import REPORTER_RX, is_known
 from ca_citations.scanner import (
     _FRACTION_AFTER_RE,
     _walk_backward_for_code,
+    footnote_against_number,
     is_federal_constitution,
     not_a_california_number,
 )
@@ -334,10 +335,14 @@ def find_section_lists(text: str, default_code: str | None = None) -> list[Extra
                                      m.group(0), m.start(), m.end()))
             continue
 
-        for part in _SPLIT.split(nums):
-            part = part.strip()
-            if not part:
-                continue
+        parts = [p.strip() for p in _SPLIT.split(nums) if p.strip()]
+        # The list's last member is the only one a capitalized word can follow:
+        # "§§ 459, 1 Because" is § 459 and a footnote number (see the scanner).
+        if len(parts) > 1 and not _DASH.search(parts[-1]) and footnote_against_number(
+            text, parts[-1], m.end("nums"), list_member=True
+        ):
+            parts.pop()
+        for part in parts:
             if _DASH.search(part):  # a range nested inside a list
                 first = re.match(_NUM, part)
                 if first:

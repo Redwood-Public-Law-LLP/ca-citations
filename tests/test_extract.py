@@ -521,3 +521,72 @@ def test_a_lettered_constitution_section_keeps_its_letter() -> None:
     """Section 1a is not section 1."""
     got = [(c.code, c.section) for c in extract("by article VI, section 1a, of the Constitution")]
     assert got == [("CONS", "VI-1a")]
+
+
+# --- a footnote number printed against a section number (2026-11-14) ----------
+# Text taken from a court's PDF has lost the superscript, so a footnote number
+# runs into the section number before it: "section 1382.[fn 2] Petitioners"
+# reads "section 1382.2 Petitioners". Every sentence is invented, in the forms
+# that occur.
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Penal Code section 1382.2 Petitioners contend the delay was improper.", set()),
+        ("Business and Professions Code section 17200.2 The plaintiffs sued.", set()),
+        ("Evidence Code section 1040.8 After some discussion, the court ruled.", set()),
+        # A list member of one or two digits; the members before it stay.
+        ("(Pen. Code, §§ 459, 1 Because the plea was entered, we do not reach it.)",
+         {("PEN", "459")}),
+        ("Insurance Code section 11580, 2 Smith v. Jones held otherwise.", {("INS", "11580")}),
+        ("(Gov. Code, § 12940,1 Smith v. Jones (1990) 1 Cal.3d 1.)", {("GOV", "12940")}),
+        ("Penal Code sections 1170.1 and 1385.1 The court struck the term.",
+         {("PEN", "1170.1")}),
+    ],
+)
+def test_a_footnote_number_is_not_part_of_the_section(text: str, expected: set) -> None:
+    assert codes(text) == expected
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        # A period between the number and the next sentence: no footnote shape.
+        ("The court applied Penal Code section 1170.1. The sentence stands.",
+         {("PEN", "1170.1")}),
+        # Two digits after the period: real sections are numbered this way.
+        ("Penal Code section 1170.12 Defendant contends otherwise.", {("PEN", "1170.12")}),
+        # Not followed by a capitalized word.
+        ("Penal Code section 1382.2 applies here.", {("PEN", "1382.2")}),
+        ("Penal Code section 1382.2, subdivision (a), applies.", {("PEN", "1382.2")}),
+        # A whole number after a singular marker is not a list member.
+        ("Penal Code section 1382 Petitioners contend otherwise.", {("PEN", "1382")}),
+        ("(Pen. Code, §§ 459, 460.)", {("PEN", "459"), ("PEN", "460")}),
+        ("Penal Code sections 12 and 13 apply.", {("PEN", "12"), ("PEN", "13")}),
+    ],
+)
+def test_forms_near_the_footnote_shape_are_unchanged(text: str, expected: set) -> None:
+    assert codes(text) == expected
+
+
+def test_a_one_digit_decimal_section_before_a_capitalized_word_is_lost() -> None:
+    """The cost of the rule: a real section in a heading looks the same."""
+    assert codes("Civil Code Section 1942.1 In one sentence the statute says so.") == set()
+
+
+# --- a page marker inside "United States" (2026-11-14) -------------------------
+# CourtListener marks reporter pages inline ("*764"), and a page can turn in the
+# middle of a name. Every sentence is invented.
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The tax was void under section 1 of article XIV of the constitution of the "
+        "United *764 States.",
+        "The clause in article VI of the United **512 States Constitution controls.",
+    ],
+)
+def test_a_page_marker_inside_united_states_is_still_federal(text: str) -> None:
+    assert extract(text) == []

@@ -927,3 +927,21 @@ def test_a_slash_between_two_sections_is_not_a_fraction(text: str, section: str)
     """'§§ 664/187' pairs attempt with the offense attempted. The first section
     is still cited, as before."""
     assert [(r.law_code, r.section_num) for r in scan(text)][:1] == [("PEN", section)]
+
+
+# --- a footnote number printed against a section number (2026-11-14) ----------
+
+
+def test_a_decimal_footnote_shape_skips_the_anchor() -> None:
+    assert scan("Penal Code section 1382.2 Petitioners contend the delay was improper.") == []
+
+
+def test_a_footnote_list_member_ends_the_list() -> None:
+    text = "(Pen. Code, §§ 459, 1 Because the plea stood.)"
+    got = [(r.law_code, r.section_num) for r in scan(text)]
+    assert got == [("PEN", "459")]
+
+
+def test_a_page_marker_inside_united_states_is_still_federal() -> None:
+    text = "under section 1 of article XIV of the constitution of the United *764 States"
+    assert scan(text) == []
